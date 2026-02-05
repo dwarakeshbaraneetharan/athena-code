@@ -18,6 +18,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "controller_interface/controller_interface.hpp"
 #include "single_ackermann_controller_parameters.hpp"
@@ -67,15 +68,26 @@ protected:
   std::shared_ptr<single_ackermann_controller::ParamListener> param_listener_;
   single_ackermann_controller::Params params_;
 
-  std::vector<std::string> drive_joint_names_;
-  std::vector<std::string> steer_joint_names_;
-
   rclcpp::Subscription<ControllerReferenceMsg>::SharedPtr ref_subscriber_ = nullptr;
   realtime_tools::RealtimeBuffer<std::shared_ptr<ControllerReferenceMsg>> input_ref_;
 
 private:
   ATHENA_DRIVE_CONTROLLERS__VISIBILITY_LOCAL
   void reference_callback(const std::shared_ptr<ControllerReferenceMsg> msg);
+
+  // Interface indices - looked up by name during on_activate
+  // Steer command interfaces
+  size_t fl_steer_cmd_idx_;
+  size_t fr_steer_cmd_idx_;
+
+  // Drive command interfaces
+  size_t fl_drive_cmd_idx_;
+  size_t fr_drive_cmd_idx_;
+  size_t rl_drive_cmd_idx_;
+  size_t rr_drive_cmd_idx_;
+
+  // Helper to find command interface index by name
+  bool find_command_interface_index(const std::string& name, size_t& index);
 };
 
 }  // namespace drive_controllers

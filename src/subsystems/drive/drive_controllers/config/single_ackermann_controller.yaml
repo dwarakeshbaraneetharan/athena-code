@@ -1,15 +1,72 @@
 # Parameters for the SingleAckermannController
 single_ackermann_controller:
-  drive_joints: {
-    type: string_array,
-    default_value: [],
-    description: "The names of the drive wheel joints."
+  # Individual joint names (explicit, not order-dependent)
+  front_left_steer_joint: {
+    type: string,
+    default_value: "",
+    description: "Name of the front left steering joint."
   }
-  steer_joints: {
-    type: string_array,
-    default_value: [],
-    description: "The names of the steering joints (front wheels)."
+  front_right_steer_joint: {
+    type: string,
+    default_value: "",
+    description: "Name of the front right steering joint."
   }
+  front_left_drive_joint: {
+    type: string,
+    default_value: "",
+    description: "Name of the front left drive joint."
+  }
+  front_right_drive_joint: {
+    type: string,
+    default_value: "",
+    description: "Name of the front right drive joint."
+  }
+  rear_left_drive_joint: {
+    type: string,
+    default_value: "",
+    description: "Name of the rear left drive joint."
+  }
+  rear_right_drive_joint: {
+    type: string,
+    default_value: "",
+    description: "Name of the rear right drive joint."
+  }
+
+  # Per-wheel steer inversion (for hardware mounting differences)
+  front_left_steer_inversion: {
+    type: bool,
+    default_value: false,
+    description: "Invert front left steering direction if true."
+  }
+  front_right_steer_inversion: {
+    type: bool,
+    default_value: false,
+    description: "Invert front right steering direction if true."
+  }
+
+  # Per-wheel drive inversion (for motor mounting differences - left/right mirrored)
+  front_left_drive_inversion: {
+    type: bool,
+    default_value: false,
+    description: "Invert front left drive direction if true."
+  }
+  front_right_drive_inversion: {
+    type: bool,
+    default_value: false,
+    description: "Invert front right drive direction if true."
+  }
+  rear_left_drive_inversion: {
+    type: bool,
+    default_value: false,
+    description: "Invert rear left drive direction if true."
+  }
+  rear_right_drive_inversion: {
+    type: bool,
+    default_value: false,
+    description: "Invert rear right drive direction if true."
+  }
+
+  # Geometry parameters
   track_width: {
     type: double,
     default_value: 0.6604,
@@ -25,6 +82,8 @@ single_ackermann_controller:
     default_value: 0.254,
     description: "Radius of the wheels in meters."
   }
+
+  # Joystick input configuration
   forward_axis: {
     type: int,
     default_value: 1,
@@ -33,13 +92,15 @@ single_ackermann_controller:
   steer_axis: {
     type: int,
     default_value: 0,
-    description: "Joystick axis for steering left/right (twist)."
+    description: "Joystick axis for steering left/right."
   }
   steer_inversion: {
     type: bool,
     default_value: true,
-    description: "Invert the steering direction if true."
+    description: "Invert the joystick steering direction if true."
   }
+
+  # Speed limits
   max_speed: {
     type: double,
     default_value: 1.27,
@@ -48,5 +109,12 @@ single_ackermann_controller:
   max_steer_angle: {
     type: double,
     default_value: 0.785,
-    description: "Maximum steering angle in radians."
+    description: "Maximum steering angle in radians (clamped to prevent geometry issues)."
+  }
+
+  # Debug mode
+  enable_debug_logging: {
+    type: bool,
+    default_value: false,
+    description: "Enable verbose debug logging for testing."
   }
