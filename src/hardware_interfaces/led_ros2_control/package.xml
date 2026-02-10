@@ -3,7 +3,7 @@
 <package format="3">
   <name>led_ros2_control</name>
   <version>0.1.0</version>
-  <description>LED hardware interface for ros2_control - GPIO-based status LED control</description>
+  <description>LED hardware interface for ros2_control - CAN-based status LED control</description>
   <maintainer email="dwarakeshbaraneetharan@gmail.com">Dwarakesh Baraneetharan</maintainer>
   <license>Apache-2.0</license>
 
@@ -14,6 +14,7 @@
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
+  <depend>umdloop_can_library</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

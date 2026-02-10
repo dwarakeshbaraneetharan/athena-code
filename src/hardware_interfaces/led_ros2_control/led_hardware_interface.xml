@@ -4,7 +4,7 @@
          base_class_type="hardware_interface::SystemInterface">
     <description>
       LED status indicator hardware interface via ros2_control.
-      GPIO output for controlling status LEDs.
+      CAN-based control for status LEDs (on/off, red, green).
     </description>
   </class>
 </library>

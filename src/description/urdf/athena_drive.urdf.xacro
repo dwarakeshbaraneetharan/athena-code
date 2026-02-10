@@ -73,8 +73,8 @@
     <xacro:odrive_ros2_control name="odrive"/>
     <xacro:rmd_ros2_control name="rmd"/>
 
-    <!-- LED status indicator (GPIO-based) -->
-    <xacro:led_ros2_control name="status_led" gpio_pin="25"/>
+    <!-- LED status indicator (CAN-based) -->
+    <xacro:led_ros2_control name="status_led"/>
 
     <!-- Killswitch (CAN-based) -->
     <xacro:killswitch_ros2_control name="drive_killswitch"/>
