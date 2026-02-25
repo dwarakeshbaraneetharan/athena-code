@@ -30,26 +30,26 @@ joint_trajectory_controller:
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
     constraints:
-      stopped_velocity_tolerance: 0.01
-      goal_time: 0.6
+      stopped_velocity_tolerance: 0.05
+      goal_time: 2.0
       base_yaw:
-        trajectory: 0.1
-        goal: 0.05
+        trajectory: 0.5
+        goal: 0.1
       shoulder_pitch:
-        trajectory: 0.1
-        goal: 0.05
+        trajectory: 0.5
+        goal: 0.1
       elbow_pitch:
-        trajectory: 0.1
-        goal: 0.05
+        trajectory: 0.5
+        goal: 0.1
       wrist_pitch:
-        trajectory: 0.1
-        goal: 0.05
+        trajectory: 0.5
+        goal: 0.1
       wrist_roll:
-        trajectory: 0.1
-        goal: 0.05
+        trajectory: 0.5
+        goal: 0.1
       gripper_claw:
-        trajectory: 0.1
-        goal: 0.05
+        trajectory: 0.5
+        goal: 0.1
       actuator:
-        trajectory: 0.1
-        goal: 0.05
+        trajectory: 0.5
+        goal: 0.1

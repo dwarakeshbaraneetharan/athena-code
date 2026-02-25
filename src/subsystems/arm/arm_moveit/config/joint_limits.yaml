@@ -11,37 +11,37 @@ joint_limits:
   actuator:
     has_velocity_limits: true
     max_velocity: 0.10000000000000001
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 2.0
   base_yaw:
     has_velocity_limits: true
     max_velocity: 0.5
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 5.0
   elbow_pitch:
     has_velocity_limits: true
     max_velocity: 0.5
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 5.0
   gripper_claw:
     min_position: -0.045
     max_position: 0.02
     has_velocity_limits: true
     max_velocity: 0.5
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 5.0
   shoulder_pitch:
     has_velocity_limits: true
     max_velocity: 0.5
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 5.0
   wrist_pitch:
     has_velocity_limits: true
     max_velocity: 0.5
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 5.0
   wrist_roll:
     has_velocity_limits: true
     max_velocity: 0.5
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 5.0

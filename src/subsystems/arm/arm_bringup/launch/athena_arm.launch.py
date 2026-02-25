@@ -110,6 +110,13 @@ def generate_launch_description():
             description="Robot controller to start.",
         )
     )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "use_moveit",
+            default_value="false",
+            description="Launch MoveIt move_group node for motion planning.",
+        )
+    )
 
     # -- Initialize Arguments --
     use_sim = LaunchConfiguration("use_sim")
@@ -125,6 +132,7 @@ def generate_launch_description():
     use_mock_hardware = LaunchConfiguration("use_mock_hardware")
     mock_sensor_commands = LaunchConfiguration("mock_sensor_commands")
     robot_controller = LaunchConfiguration("robot_controller")
+    use_moveit = LaunchConfiguration("use_moveit")
     
     # -- Building Path Files --
     # Get URDF via xacro.
@@ -187,7 +195,7 @@ def generate_launch_description():
         .robot_description_kinematics(file_path=robot_kinematics_path.perform(LaunchContext()))
         .trajectory_execution(file_path=moveit_controllers_config_path.perform(LaunchContext()))
         .planning_scene_monitor(
-            publish_robot_description=True, publish_robot_description_semantic=True
+            publish_robot_description=False, publish_robot_description_semantic=True
         )
         .planning_pipelines(
             pipelines=["ompl", "pilz_industrial_motion_planner"],
@@ -363,7 +371,8 @@ def generate_launch_description():
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
-        parameters=[moveit_config.to_dict()]
+        parameters=[moveit_config.to_dict()],
+        condition=IfCondition(use_moveit),
     )
 
     hello_moveit_node = Node(
@@ -382,7 +391,7 @@ def generate_launch_description():
             # joint_state_publisher, # sends 0s to /joint_states
             # joint_state_publisher_gui_node, # sends gui values to /joint_states
             robot_state_pub_node, # handles tf transforms, uses urdf on startup, then subscribers to /joint_states to update
-            # move_group_node,
+            move_group_node,
             # hello_moveit_node,
             delay_joint_state_broadcaster_spawner_after_ros2_control_node, # reads from hardware and sends values to /joint_states
             delay_rviz_after_joint_state_broadcaster_spawner,
