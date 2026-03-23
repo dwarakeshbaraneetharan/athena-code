@@ -1,59 +1,86 @@
+#include <chrono>
 #include <memory>
+#include <string>
+#include <thread>
+#include <vector>
 
 #include <rclcpp/rclcpp.hpp>
 #include "moveit/move_group_interface/move_group_interface.h"
 
+using moveit::planning_interface::MoveGroupInterface;
+
 int main(int argc, char * argv[])
 {
-  // Initialize ROS and create the Node
   rclcpp::init(argc, argv);
   auto const node = std::make_shared<rclcpp::Node>(
     "hello_moveit",
     rclcpp::NodeOptions().automatically_declare_parameters_from_overrides(true)
   );
 
-  // Create a ROS logger
   auto const logger = rclcpp::get_logger("hello_moveit");
 
-  // Create the MoveIt MoveGroup Interface
-  using moveit::planning_interface::MoveGroupInterface;
+  // Spin in the background so MoveIt action clients / TF can progress (needed for multi-step).
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(node);
+  std::thread spin_thread([&executor]() { executor.spin(); });
 
-  // athena_arm is the planning group
-  auto move_group_interface = MoveGroupInterface(node, "athena_arm");
+  static constexpr char kPlanningGroup[] = "athena_arm";
+
+  MoveGroupInterface move_group_interface(node, kPlanningGroup);
   move_group_interface.setPlannerId("RRTConnectkConfigDefault");
 
-  // Set a target Pose
-  // auto const target_pose = []{
-  //   geometry_msgs::msg::Pose msg;
-  //   msg.orientation.w = 1.0;
-  //   msg.position.x = 0;
-  //   msg.position.y = 0.5;
-  //   msg.position.z = 0.5;
-  //   return msg;
-  // }();
-  // move_group_interface.setPoseTarget(target_pose);
-  move_group_interface.setStartStateToCurrentState();
-  move_group_interface.setNamedTarget("ready");
-  // move_group_interface.setRandomTarget();
+  // Virtual demo: plan and execute a short sequence of named joint goals (see athena_arm.srdf).
+  const std::vector<std::string> trajectory_targets = {
+    "ready",
+    "look_left",
+    "look_right",
+    "ready",
+  };
 
-  // Create a plan to that target pose
-  auto const [success, plan] = [&move_group_interface]{
-    moveit::planning_interface::MoveGroupInterface::Plan msg;
-    auto const ok = static_cast<bool>(move_group_interface.plan(msg));
-    return std::make_pair(ok, msg);
-  }();
+  for (size_t step = 0; step < trajectory_targets.size(); ++step) {
+    const std::string & target_name = trajectory_targets[step];
 
-  // Execute the plan
-  if(success) {
-    moveit::core::MoveItErrorCode status = move_group_interface.execute(plan);
-    // RCLCPP_INFO(logger, "Execute code: %s\nExecute message: %s\nExecute source: %s",
-      // moveit::core::error_code_to_string(status).c_str(),
-    // status.message.c_str(), status.source.c_str());
-  } else {
-    RCLCPP_ERROR(logger, "Planning failed!");
+    move_group_interface.setStartStateToCurrentState();
+    if (!move_group_interface.setNamedTarget(target_name)) {
+      RCLCPP_ERROR(logger, "Unknown named target '%s' (check SRDF group_state for group %s)",
+        target_name.c_str(), kPlanningGroup);
+      executor.cancel();
+      spin_thread.join();
+      rclcpp::shutdown();
+      return 2;
+    }
+
+    MoveGroupInterface::Plan plan;
+    const bool planned = static_cast<bool>(move_group_interface.plan(plan));
+    if (!planned) {
+      RCLCPP_ERROR(logger, "Planning failed at step %zu -> '%s'", step, target_name.c_str());
+      executor.cancel();
+      spin_thread.join();
+      rclcpp::shutdown();
+      return 3;
+    }
+
+    RCLCPP_INFO(logger, "Executing step %zu / %zu -> '%s'",
+      step + 1, trajectory_targets.size(), target_name.c_str());
+
+    const auto result = move_group_interface.execute(plan);
+    if (result != moveit::core::MoveItErrorCode::SUCCESS) {
+      RCLCPP_ERROR(logger, "Execute failed at step %zu -> '%s' (code %d)",
+        step, target_name.c_str(), static_cast<int>(result.val));
+      executor.cancel();
+      spin_thread.join();
+      rclcpp::shutdown();
+      return 4;
+    }
+
+    // Brief pause between segments so logs / RViz are easier to follow (virtual testing).
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
   }
 
-  // Shutdown ROS
+  RCLCPP_INFO(logger, "Completed %zu planned trajectories.", trajectory_targets.size());
+
+  executor.cancel();
+  spin_thread.join();
   rclcpp::shutdown();
   return 0;
 }

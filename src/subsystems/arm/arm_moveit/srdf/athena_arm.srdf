@@ -29,6 +29,25 @@
         <joint name="wrist_pitch" value="-1.39626"/>
         <joint name="wrist_roll" value="0"/>
     </group_state>
+    <!-- Extra named states for multi-trajectory hello_moveit demo (virtual testing) -->
+    <group_state name="look_left" group="athena_arm">
+        <joint name="actuator" value="0"/>
+        <joint name="base_yaw" value="0.5"/>
+        <joint name="elbow_pitch" value="-2.61799"/>
+        <joint name="gripper_claw" value="-0.045"/>
+        <joint name="shoulder_pitch" value="-2.21657"/>
+        <joint name="wrist_pitch" value="-1.39626"/>
+        <joint name="wrist_roll" value="0"/>
+    </group_state>
+    <group_state name="look_right" group="athena_arm">
+        <joint name="actuator" value="0"/>
+        <joint name="base_yaw" value="-0.5"/>
+        <joint name="elbow_pitch" value="-2.61799"/>
+        <joint name="gripper_claw" value="-0.045"/>
+        <joint name="shoulder_pitch" value="-2.21657"/>
+        <joint name="wrist_pitch" value="-1.39626"/>
+        <joint name="wrist_roll" value="0"/>
+    </group_state>
     <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
     <disable_collisions link1="actuator" link2="forearm" reason="Default"/>
     <disable_collisions link1="actuator" link2="gripper_claw" reason="Adjacent"/>

@@ -187,7 +187,7 @@ def generate_launch_description():
         .robot_description_kinematics(file_path=robot_kinematics_path.perform(LaunchContext()))
         .trajectory_execution(file_path=moveit_controllers_config_path.perform(LaunchContext()))
         .planning_scene_monitor(
-            publish_robot_description=True, publish_robot_description_semantic=True
+            publish_robot_description=False, publish_robot_description_semantic=True
         )
         .planning_pipelines(
             pipelines=["ompl", "pilz_industrial_motion_planner"],
@@ -396,8 +396,7 @@ def generate_launch_description():
             # joint_state_publisher, # sends 0s to /joint_states
             # joint_state_publisher_gui_node, # sends gui values to /joint_states
             robot_state_pub_node, # handles tf transforms, uses urdf on startup, then subscribers to /joint_states to update
-            # move_group_node,
-            # hello_moveit_node,
+            move_group_node,
             delay_joint_state_broadcaster_spawner_after_ros2_control_node, # reads from hardware and sends values to /joint_states
             delay_motor_status_broadcaster_after_joint_state_broadcaster,
             delay_rviz_after_joint_state_broadcaster_spawner,
