@@ -1,13 +1,17 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="rmd_ros2_control" params="name">
+  <xacro:macro name="rmd_ros2_control" params="name can_interface:=can0 coupled_mode:=true coupling_factor:=1.0">
     <ros2_control name="${name}" type="system">
       <hardware>
         <plugin>rmd_ros2_control/RMDHardwareInterface</plugin>
         <param name="update_rate">2</param> <!-- Hz -->
         <param name="logger_rate">5</param> <!-- Hz -->
         <param name="logger_state">0</param> <!-- 0 for off, 1 for on -->
-        <param name="can_interface">can0</param>
+        <param name="can_interface">${can_interface}</param>
+        <param name="coupled_mode">${coupled_mode}</param>
+        <param name="coupling_factor">${coupling_factor}</param>
+        <param name="driving_joint">shoulder_pitch</param>
+        <param name="coupled_joint">elbow_pitch</param>
       </hardware>
 
       <joint name="shoulder_pitch">

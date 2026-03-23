@@ -131,6 +131,12 @@ private:
   // Active control mode for each actuator
   std::vector<integration_level_t> control_level_;
 
+  // Belt coupling parameters (shoulder-elbow pulley system)
+  bool coupled_mode_ = false;
+  double coupling_factor_ = 0.0;
+  int driving_joint_idx_ = -1;
+  int coupled_joint_idx_ = -1;
+
   // CAN Commands
   static constexpr uint8_t BRAKE_RELEASE_CMD = 0X77;
   static constexpr uint8_t BRAKE_LOCK_CMD = 0x78;

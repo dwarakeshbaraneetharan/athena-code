@@ -138,6 +138,34 @@ hardware_interface::CallbackReturn RMDHardwareInterface::on_init(
   logger_state = std::stoi(info_.hardware_parameters.at("logger_state"));
   can_interface = info_.hardware_parameters.at("can_interface");
 
+  // Belt coupling: resolve driving/coupled joint indices by name
+  auto it_coupled = info_.hardware_parameters.find("coupled_mode");
+  if (it_coupled != info_.hardware_parameters.end() &&
+      (it_coupled->second == "true" || it_coupled->second == "True")) {
+    coupled_mode_ = true;
+    coupling_factor_ = std::stod(info_.hardware_parameters.at("coupling_factor"));
+
+    std::string driving_name = info_.hardware_parameters.at("driving_joint");
+    std::string coupled_name = info_.hardware_parameters.at("coupled_joint");
+
+    for (int i = 0; i < num_joints; ++i) {
+      if (info_.joints[i].name == driving_name) driving_joint_idx_ = i;
+      if (info_.joints[i].name == coupled_name) coupled_joint_idx_ = i;
+    }
+
+    if (driving_joint_idx_ < 0 || coupled_joint_idx_ < 0) {
+      RCLCPP_ERROR(rclcpp::get_logger("RMDHardwareInterface"),
+        "Belt coupling: joint name not found (driving='%s', coupled='%s')",
+        driving_name.c_str(), coupled_name.c_str());
+      return hardware_interface::CallbackReturn::ERROR;
+    }
+
+    RCLCPP_INFO(rclcpp::get_logger("RMDHardwareInterface"),
+      "Belt coupling enabled: %s (idx %d) drives %s (idx %d), factor=%.2f",
+      driving_name.c_str(), driving_joint_idx_,
+      coupled_name.c_str(), coupled_joint_idx_, coupling_factor_);
+  }
+
   elapsed_update_time = 0.0;
   elapsed_time = 0.0;
   elapsed_logger_time = 0.0;
@@ -320,10 +348,17 @@ hardware_interface::CallbackReturn RMDHardwareInterface::on_deactivate(
 hardware_interface::return_type RMDHardwareInterface::read(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {  
-  // CALCULATING JOINT STATE
   for(int i = 0; i < num_joints; i++) {
     joint_state_velocity_[i] = calculate_joint_velocity_from_motor_velocity(motor_velocity[i], joint_gear_ratios[i]);
     joint_state_position_[i] = calculate_joint_position_from_motor_position(motor_position[i], joint_gear_ratios[i]);
+  }
+
+  // Belt coupling: remove the driving joint's contribution from the coupled joint's reading.
+  // The loop above already computed joint_state for ALL joints (including the driving joint),
+  // and the driving joint's values are not modified by coupling, so we can use them directly.
+  if (coupled_mode_) {
+    joint_state_position_[coupled_joint_idx_] -= coupling_factor_ * joint_state_position_[driving_joint_idx_];
+    joint_state_velocity_[coupled_joint_idx_] -= coupling_factor_ * joint_state_velocity_[driving_joint_idx_];
   }
 
   return hardware_interface::return_type::OK;
@@ -357,17 +392,33 @@ hardware_interface::return_type rmd_ros2_control::RMDHardwareInterface::write(
   // desired frequency of the HWI, skip message
   if(elapsed_update_time > update_period){
     elapsed_update_time = 0.0;
+
+    // Belt coupling: get driving joint's current state for command compensation.
+    // read() already computed these and did NOT modify the driving joint's values.
+    double driving_joint_pos = 0.0;
+    double driving_joint_vel = 0.0;
+    if (coupled_mode_) {
+      driving_joint_pos = joint_state_position_[driving_joint_idx_];
+      driving_joint_vel = joint_state_velocity_[driving_joint_idx_];
+    }
+
     for(int i = 0; i < num_joints; i++) {
       can_tx_frame_ = CANLib::CanFrame(); // Must reinstantiate else data from past iteration gets repeated
       can_tx_frame_.id = joint_node_write_ids[i];
       can_tx_frame_.dlc = 8;
-      
-      if(control_level_[i] == integration_level_t::POSITION && std::isfinite(joint_command_position_[i])) {
 
-        // CALCULATE DESIRED JOINT ANGLE
-        joint_angle = joint_orientation[i]*calculate_motor_position_from_desired_joint_position(joint_command_position_[i], joint_gear_ratios[i]);
+      // Belt coupling: adjust the coupled joint's command to compensate for belt
+      double effective_pos = joint_command_position_[i];
+      double effective_vel = joint_command_velocity_[i];
+      if (coupled_mode_ && i == coupled_joint_idx_) {
+        effective_pos = joint_command_position_[i] + coupling_factor_ * driving_joint_pos;
+        effective_vel = joint_command_velocity_[i] + coupling_factor_ * driving_joint_vel;
+      }
+      
+      if(control_level_[i] == integration_level_t::POSITION && std::isfinite(effective_pos)) {
+
+        joint_angle = joint_orientation[i]*calculate_motor_position_from_desired_joint_position(effective_pos, joint_gear_ratios[i]);
         
-        // ENCODING CAN MESSAGE
         data[0] = ABSOLUTE_POS_CONTROL_CMD;
         data[1] = 0x00;
         data[2] = operating_velocity & 0xFF;
@@ -377,12 +428,10 @@ hardware_interface::return_type rmd_ros2_control::RMDHardwareInterface::write(
         data[6] = (joint_angle >> 16) & 0xFF;
         data[7] = (joint_angle >> 24) & 0xFF;      
       }
-      else if(control_level_[i] == integration_level_t::VELOCITY && std::isfinite(joint_command_velocity_[i])) {
+      else if(control_level_[i] == integration_level_t::VELOCITY && std::isfinite(effective_vel)) {
         
-        // CALCULATE DESIRED JOINT VELOCITY
-        joint_velocity = joint_orientation[i]*calculate_motor_velocity_from_desired_joint_velocity(joint_command_velocity_[i], joint_gear_ratios[i]);
+        joint_velocity = joint_orientation[i]*calculate_motor_velocity_from_desired_joint_velocity(effective_vel, joint_gear_ratios[i]);
      
-        // ENCODING CAN MESSAGE
         data[0] = SPEED_CONTROL_CMD;
         data[1] = 0x00;
         data[2] = 0x00;
@@ -393,8 +442,6 @@ hardware_interface::return_type rmd_ros2_control::RMDHardwareInterface::write(
         data[7] = (joint_velocity >> 24) & 0xFF;
       }
       else{
-        // RCLCPP_WARN(rclcpp::get_logger("RMDHardwareInterface"), "Joint command value not found or undefined command state. Sending Motor Status 3 commands for now.");
-        // ENCODING CAN MESSAGE
         data[0] = MOTOR_STATUS_2_CMD;
       }
 
