@@ -3,10 +3,11 @@ project(arm_moveit)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 
 add_executable(hello_moveit src/hello_moveit.cpp)
-ament_target_dependencies(hello_moveit rclcpp moveit_ros_planning_interface)
+ament_target_dependencies(hello_moveit rclcpp geometry_msgs moveit_ros_planning_interface)
 
 target_include_directories(hello_moveit PUBLIC
 "${CMAKE_CURRENT_SOURCE_DIR}/../moveit2/moveit_ros/planning_interface/move_group_interface/include")

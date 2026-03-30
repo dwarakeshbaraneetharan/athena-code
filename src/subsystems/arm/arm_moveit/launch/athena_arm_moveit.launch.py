@@ -1,4 +1,6 @@
 from launch import LaunchDescription, LaunchContext
+from launch.actions import RegisterEventHandler, TimerAction
+from launch.event_handlers import OnProcessExit, OnProcessStart
 from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 
 from launch_ros.actions import Node
@@ -7,63 +9,54 @@ from launch_ros.substitutions import FindPackageShare
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
-
 def generate_launch_description():
 
-    joint_state_yaml = PathJoinSubstitution(
-        [
-            FindPackageShare("arm_bringup"),
-            "config",
-            "initial_joint_states.yaml",
-        ]
+    robot_description_path = PathJoinSubstitution(
+        [FindPackageShare("description"), "urdf", "athena_arm.urdf.xacro"]
     )
-        
-    robot_description_path = PathJoinSubstitution([FindPackageShare("description"),
-                                                   "urdf",
-                                                   "athena_arm.urdf.xacro"])
-    robot_semantic_path = PathJoinSubstitution([FindPackageShare("arm_moveit"),
-                                                "srdf",
-                                                "athena_arm.srdf"])
-    robot_kinematics_path = PathJoinSubstitution([FindPackageShare("arm_moveit"),
-                                                  "config",
-                                                  "kinematics.yaml"])
-    moveit_controllers_config_path = PathJoinSubstitution([FindPackageShare("arm_moveit"),
-                                                           "config",
-                                                           "moveit_controllers.yaml"])
-    
-    # Eventually want to use this, for now the package will be independent
+    robot_controllers = PathJoinSubstitution(
+        [FindPackageShare("arm_bringup"), "config", "athena_arm_controllers.yaml"]
+    )
     rviz_config_file = PathJoinSubstitution(
-        [
-            FindPackageShare("description"), 
-            "rviz", 
-            "rviz_config.rviz"
-        ]
+        [FindPackageShare("description"), "rviz", "rviz_config.rviz"]
     )
 
-    # rviz_config_file = PathJoinSubstitution(
-    #     [
-    #         FindPackageShare("arm_moveit"), 
-    #         "rviz", 
-    #         "moveit.rviz"
-    #     ]
-    # )
-    
+    robot_description_content = Command([
+        PathJoinSubstitution([FindExecutable(name="xacro")]),
+        " ", robot_description_path,
+        " use_mock_hardware:=true",
+    ])
+    robot_description = {"robot_description": robot_description_content}
 
-    # Load the robot configuration
     moveit_config = (
-        MoveItConfigsBuilder(
-            "athena_arm", package_name="arm_moveit"
-        )
-        .robot_description(robot_description_path.perform(LaunchContext()))
+        MoveItConfigsBuilder("athena_arm", package_name="arm_moveit")
+        .robot_description(file_path=robot_description_path.perform(LaunchContext()))
         .robot_description_semantic("srdf/athena_arm.srdf")
+        .robot_description_kinematics(file_path="config/kinematics.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
         .planning_scene_monitor(
-            publish_robot_description=True, publish_robot_description_semantic=True
+            publish_robot_description=False, publish_robot_description_semantic=True
         )
         .planning_pipelines(
-            pipelines=["ompl", "pilz_industrial_motion_planner"]
+            pipelines=["ompl", "pilz_industrial_motion_planner"],
+            default_planning_pipeline="ompl",
         )
         .to_moveit_configs()
+    )
+
+    control_node = Node(
+        package="controller_manager",
+        executable="ros2_control_node",
+        output="both",
+        parameters=[robot_controllers],
+        remappings=[("~/robot_description", "/robot_description")],
+    )
+
+    robot_state_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        output="both",
+        parameters=[robot_description],
     )
 
     rviz_node = Node(
@@ -81,29 +74,7 @@ def generate_launch_description():
         ],
     )
 
-    robot_state_publisher = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        name="robot_state_publisher",
-        output="both",
-        parameters=[moveit_config.robot_description],
-    )
-
-    joint_state_publisher = Node(
-        package='joint_state_publisher',
-        executable='joint_state_publisher',
-        name='joint_state_publisher',
-        parameters=[joint_state_yaml],
-        output='screen'
-    )
-
-    joint_state_publisher_gui_node = Node( 
-        package='joint_state_publisher_gui',
-        executable='joint_state_publisher_gui',
-        name='joint_state_publisher_gui'
-    ) # This is doing my transformations ONLY when there are no previous joint states.
-
-    run_move_group_node = Node(
+    move_group_node = Node(
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
@@ -117,12 +88,52 @@ def generate_launch_description():
         parameters=[moveit_config.to_dict()],
     )
 
-    nodes = [
-                # joint_state_publisher,
-                joint_state_publisher_gui_node,
-                robot_state_publisher,
-                rviz_node,
-                run_move_group_node,
-                hello_moveit_node
-            ]
-    return LaunchDescription(nodes)
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster"],
+    )
+
+    jtc_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_trajectory_controller", "-c", "/controller_manager"],
+    )
+
+    delay_jsb = RegisterEventHandler(
+        event_handler=OnProcessStart(
+            target_action=control_node,
+            on_start=[TimerAction(period=3.0, actions=[joint_state_broadcaster_spawner])],
+        )
+    )
+
+    delay_jtc = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[jtc_spawner],
+        )
+    )
+
+    delay_rviz = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[rviz_node],
+        )
+    )
+
+    delay_hello_moveit = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=jtc_spawner,
+            on_exit=[TimerAction(period=5.0, actions=[hello_moveit_node])],
+        )
+    )
+
+    return LaunchDescription([
+        control_node,
+        robot_state_publisher,
+        move_group_node,
+        delay_jsb,
+        delay_jtc,
+        delay_rviz,
+        delay_hello_moveit,
+    ])
